@@ -1,2 +1,2 @@
 # compare_sales_chart
-Compare sales using highchairs modules
+Compare sales using highcharts modules
