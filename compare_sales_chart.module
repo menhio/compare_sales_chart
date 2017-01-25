@@ -1,0 +1,247 @@
+<?php
+
+/*
+ * Implements hook_permission()
+ */
+function compare_sales_chart_permission() {
+  return array(
+    'acceso comparativo de ventas' => array(
+      'title' => t('Comparativo de Ventas'),
+      'description' => t('Administración de permisos del Comparativo.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function compare_sales_chart_block_info() {
+  $blocks = array();
+  $blocks['compare_sales_block'] = array(
+    'info' => t('Block - Comparativa de Ventas'),
+  );
+  
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function compare_sales_chart_block_view($delta='') {
+  $block = array();
+  
+  switch($delta) {
+    case 'compare_sales_block' :
+      $block['content'] = compare_sales();
+      break;
+  }
+  
+  return $block;
+}
+
+/**
+* Implements hook_menu().
+*/
+function compare_sales_chart_menu() {
+  $items['reportes/charts/mensual/compara-ventas-form'] = array(
+    'title' => 'Comparar Ventas por Mes',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('compare_sales_form'),
+    'type' => MENU_NORMAL_ITEM,
+    'access arguments' => array('acceso comparativo de ventas'),
+  );
+  
+  $items['reportes/charts/mensual/compara-ventas'] = array(
+  'title' => 'Comparativo de Ventas',
+  'page callback' => 'compare_sales',
+  'access arguments' => array('acceso comparativo de ventas'),
+  'type' => MENU_CALLBACK,
+  );
+
+return $items;
+}
+
+/*
+ * Implements hook_form()
+ */
+function compare_sales_form($form, &$form_state) {
+ 
+  $form = array();
+  
+  $months = array(
+    '01' => 'Enero', 
+    '02' => 'Febrero',
+    '03' => 'Marzo', 
+    '04' => 'Abril', 
+    '05' => 'Mayo', 
+    '06' => 'Junio', 
+    '07' => 'Julio', 
+    '08' => 'Agosto',
+    '09' => 'Septiembre',
+    '10' => 'Octubre',
+    '11' => 'Noviembre',
+    '12' => 'Diciembre',
+  );
+  
+  $form['month1'] = array(
+    '#title' => t('Mes 1'),
+    '#type' => 'select',
+    '#required' => TRUE,
+    '#options' => $months,
+    '#default_value' => 01,
+  );
+  
+  $form['year1'] = array(
+    '#title' => t('Año 1'),
+    '#type' => 'select',
+    '#options' => array(
+      '2016' => '2016', 
+      '2017' => '2017'),
+    '#default_value' => 2016,
+  );
+  
+  $form['month2'] = array(
+    '#title' => t('Mes 2'),
+    '#type' => 'select',
+    '#required' => TRUE,
+    '#options' => $months,
+    '#default_value' => 01,
+  );
+  
+  $form['year2'] = array(
+    '#title' => t('Año 2'),
+    '#type' => 'select',
+    '#options' => array(
+      '2016' => '2016', 
+      '2017' => '2017'),
+    '#default_value' => 2017,
+  );
+ 
+  $form['submit'] = array(
+    '#type' => 'submit', 
+    '#value' => t('Comparar'),
+  );
+  
+  return $form;
+}
+
+/*
+ * Implements hook_validate()
+ */
+function compare_sales_form_validate($form, &$form_state) {
+  
+  if ($form_state['values']['month1'] == $form_state['values']['month2'] && 
+      $form_state['values']['year1'] == $form_state['values']['year2']) {
+    form_set_error('week1', t('Está cargando los mismo datos, intente otra vez!'));
+  }
+  
+}
+
+/*
+ * Implements hook_submit()
+ */
+function compare_sales_form_submit($form, &$form_state) {
+  $month1 = $form_state['values']['month1'];
+  $month2 = $form_state['values']['month2'];
+  $year1 = $form_state['values']['year1'];
+  $year2 = $form_state['values']['year2'];
+  
+  //drupal_set_message(t('La semana ' . $week . ' y el año ' . $year));
+  $form_state['redirect'] = array(
+      'reportes/charts/mensual/compara-ventas',
+    array(
+      'query' => array(
+        'month1' => $month1,
+        'year1' => $year1,
+        'month2' => $month2,
+        'year2' => $year2,
+      ),
+    ),
+    );
+}
+
+/**
+ * Callback function for menu item.
+ */
+function compare_sales() {
+  //$week_number = check_plain($_GET["week"]);
+  $table = 'compare_sales';
+  //$get_month1 = check_plain($_GET["month1"]);
+  $cur_month1 = date('m');
+  $past_time = strtotime("-1 year", time());
+  $cur_year = date('Y');
+  $past_year = date("Y", $past_time);
+  $month1 = isset($_GET["month1"]) ? $_GET["month1"] : $cur_month1;
+  $month2 = isset($_GET["month2"]) ? $_GET["month2"] : $cur_month1;
+  //$month1 = $cur_month1;
+  //$year1 = date("Y", $past_time);
+  //$year2 = date('Y');
+  $year1 = isset($_GET["year1"]) ? $_GET["year1"] : $past_year;
+  $year2 = isset($_GET["year2"]) ? $_GET["year2"] : $cur_year;
+  $date1 = $month1 . '-' . $year1;
+  $date2 = $month2 . '-' . $year2;
+  
+  $query = db_select($table, 'ventas');
+  $query->addField('ventas', 'empresa', 'empresa');
+  $query->addField('ventas', 'fecha', 'fecha');
+  $query->addField('ventas', 'ventas', 'ventas');
+  $query->condition('ventas.fecha', $date1, '=');
+  $query->orderBy('empresa');
+  $exeResults = $query->execute();
+  $results1 = $exeResults->fetchAll();
+  //print_r($results1);
+  $chrysler1 = $results1[0]->ventas;
+  $fiat1 = $results1[1]->ventas;
+  $mitsubishi1 = $results1[2]->ventas;
+  $seminuevos1 = $results1[3]->ventas;
+  
+  $query = db_select($table, 'ventas');
+  $query->addField('ventas', 'empresa', 'empresa');
+  $query->addField('ventas', 'fecha', 'fecha');
+  $query->addField('ventas', 'ventas', 'ventas');
+  $query->condition('ventas.fecha', $date2, '=');
+  $query->orderBy('empresa');
+  $exeResults = $query->execute();
+  $results = $exeResults->fetchAll();
+  //print_r($results);
+  $chrysler2 = $results[0]->ventas;
+  $fiat2 = $results[1]->ventas;
+  $mitsubishi2 = $results[2]->ventas;
+  $seminuevos2 = $results[3]->ventas;
+  $data = array(
+    array('ventas' => 'Mitsubishi', '2016' => $mitsubishi1),
+    array('ventas' => 'Mitsubishi', '2017' => $mitsubishi2),
+    array('ventas' => 'Chrysler', '2016' => $chrysler1),
+    array('ventas' => 'Chrysler', '2017' => $chrysler2),
+    array('ventas' => 'FIAT', '2016' => $fiat1),
+    array('ventas' => 'FIAT', '2017' => $fiat2),
+    array('ventas' => 'Seminuevos', '2016' => $seminuevos1),
+    array('ventas' => 'Seminuevos', '2017' => $seminuevos2),
+  );
+
+  $options_column = array(
+    'title' => 'Comparativa de Ventas ' . $date1 . ' y ' . $date2,
+    'fields' => array(
+      '2016' => array(
+        'label' => t($year1),
+        'enabled' => TRUE,
+      ),
+      '2017' => array(
+        'label' => t($year2),
+        'enabled' => TRUE,
+      ),
+    ),
+    'xAxis' => array(
+      'labelField' => 'ventas',
+    ),
+    'data' => $data,
+    'type' => 'column',
+  );
+
+  $build['column'] =  array(
+    '#theme' => 'visualization',
+    '#options' => $options_column,
+  );
+
+  return $build;
+}
