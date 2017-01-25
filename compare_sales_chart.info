@@ -1,0 +1,4 @@
+name = Compare Sales Chart
+description = Gráfica para comparar las ventas mensual.
+core = 7.x
+package = Palmas
